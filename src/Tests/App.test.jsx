@@ -1,99 +1,142 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import App from '../App';
 
+// Mock localStorage
+const localStorageMock = {
+  getItem: jest.fn(),
+  setItem: jest.fn(),
+  clear: jest.fn(),
+};
+global.localStorage = localStorageMock;
+
 describe('App integration tests', () => {
-test('renders main sections of the app', () => {
-render(<App />);
+  beforeEach(() => {
+    // Clear all mocks before each test
+    localStorageMock.getItem.mockClear();
+    localStorageMock.setItem.mockClear();
+    localStorageMock.clear.mockClear();
+  });
 
+  test('renders the add project form', () => {
+    render(<App />);
+    const formTitle = screen.getByText(/Add New Project/i);
+    expect(formTitle).toBeInTheDocument();
+  });
 
-expect(
-  screen.getByRole('heading', { name: /portfolio projects/i })
-).toBeInTheDocument();
+  test('renders the search bar', () => {
+    render(<App />);
+    const searchInput = screen.getByPlaceholderText(/Search projects/i);
+    expect(searchInput).toBeInTheDocument();
+  });
 
-expect(
-  screen.getByRole('heading', { name: /add new project/i })
-).toBeInTheDocument();
+  test('adds a new project when form is submitted', async () => {
+    render(<App initialData={[]} />);
 
-expect(
-  screen.getByRole('textbox', { name: /search projects/i })
-).toBeInTheDocument();
+    // Fill out the form
+    const titleInput = screen.getByLabelText(/Project Title/i);
+    const descriptionInput = screen.getByLabelText(/Description/i);
+    const addButton = screen.getByRole('button', { name: /Add Project/i });
 
+    fireEvent.change(titleInput, { target: { value: 'Test Project' } });
+    fireEvent.change(descriptionInput, { target: { value: 'Test Description' } });
+    fireEvent.click(addButton);
 
-});
+    // Check if project was added
+    await waitFor(() => {
+      expect(screen.getByText('Test Project')).toBeInTheDocument();
+    });
+  });
 
-test('adds a new project via the form', () => {
-render(<App />);
+  test('searches and filters projects', async () => {
+    const testProjects = [
+      {
+        id: 1,
+        title: 'React App',
+        description: 'A React application',
+        technologies: ['React'],
+        category: 'Web'
+      },
+      {
+        id: 2,
+        title: 'Node API',
+        description: 'A Node.js API',
+        technologies: ['Node.js'],
+        category: 'Backend'
+      }
+    ];
 
+    render(<App initialData={testProjects} />);
 
-fireEvent.change(
-  screen.getByLabelText(/project title/i),
-  { target: { value: 'React Admin Dashboard' } }
-);
+    // Initially both projects should be visible
+    expect(screen.getByText('React App')).toBeInTheDocument();
+    expect(screen.getByText('Node API')).toBeInTheDocument();
 
-fireEvent.change(
-  screen.getByLabelText(/description/i),
-  { target: { value: 'Admin dashboard built with React' } }
-);
+    // Search for "React"
+    const searchInput = screen.getByPlaceholderText(/Search projects/i);
+    fireEvent.change(searchInput, { target: { value: 'React' } });
 
-fireEvent.click(
-  screen.getByRole('button', { name: /add project/i })
-);
+    // Only React App should be visible
+    await waitFor(() => {
+      expect(screen.getByText('React App')).toBeInTheDocument();
+      expect(screen.queryByText('Node API')).not.toBeInTheDocument();
+    });
+  });
 
-expect(
-  screen.getByRole('heading', { name: /react admin dashboard/i })
-).toBeInTheDocument();
+  test('deletes a project when delete button is clicked', async () => {
+    const testProjects = [
+      {
+        id: 1,
+        title: 'Enterprise E-Commerce Platform',
+        description: 'A scalable e-commerce solution',
+        technologies: ['React', 'Node.js'],
+        category: 'Web'
+      }
+    ];
 
+    render(<App initialData={testProjects} />);
 
-});
+    // Project should be visible
+    const projectTitle = screen.getByText('Enterprise E-Commerce Platform');
+    expect(projectTitle).toBeInTheDocument();
 
-test('filters projects based on search input', () => {
-render(<App />);
+    // Find and hover over the project card to reveal delete button
+    const projectCard = projectTitle.closest('.group');
+    fireEvent.mouseEnter(projectCard);
 
+    // Find and click the delete button
+    const deleteButton = screen.getByLabelText(/Delete Enterprise E-Commerce Platform/i);
+    fireEvent.click(deleteButton);
 
-fireEvent.change(
-  screen.getByRole('textbox', { name: /search projects/i }),
-  { target: { value: 'react' } }
-);
+    // Project should be removed
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Enterprise E-Commerce Platform')
+      ).not.toBeInTheDocument();
+    });
+  });
 
-expect(
-  screen.getByRole('heading', {
-    name: /enterprise e-commerce platform/i,
-  })
-).toBeInTheDocument();
+  test('displays empty state when no projects exist', () => {
+    render(<App initialData={[]} />);
+    
+    expect(screen.getByText(/No projects yet/i)).toBeInTheDocument();
+  });
 
-expect(
-  screen.queryByRole('heading', {
-    name: /real-time analytics dashboard/i,
-  })
-).not.toBeInTheDocument();
+  test('displays no results message when search has no matches', () => {
+    const testProjects = [
+      {
+        id: 1,
+        title: 'React App',
+        description: 'A React application',
+        technologies: ['React'],
+        category: 'Web'
+      }
+    ];
 
+    render(<App initialData={testProjects} />);
 
-});
+    const searchInput = screen.getByPlaceholderText(/Search projects/i);
+    fireEvent.change(searchInput, { target: { value: 'NonexistentProject' } });
 
-test('deletes a project when delete button is clicked', () => {
-render(<App />);
-
-
-// Confirm project exists first
-expect(
-  screen.getByRole('heading', {
-    name: /enterprise e-commerce platform/i,
-  })
-).toBeInTheDocument();
-
-const deleteButtons = screen.getAllByRole('button', {
-  name: /delete/i,
-});
-
-fireEvent.click(deleteButtons[0]);
-
-// Project should be removed from the DOM
-expect(
-  screen.queryByRole('heading', {
-    name: /enterprise e-commerce platform/i,
-  })
-).not.toBeInTheDocument();
-
-
-});
+    expect(screen.getByText(/No projects found matching your search/i)).toBeInTheDocument();
+  });
 });

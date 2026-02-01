@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
 
 // AddProjectForm Component - Form to add new projects
-// - onAddProject: Function to call with new project data
 const AddProjectForm = ({ onAddProject }) => {
   // Form state management
   const [title, setTitle] = useState('');
@@ -16,7 +15,7 @@ const AddProjectForm = ({ onAddProject }) => {
     if (title.trim() && description.trim()) {
       // Create new project object
       const newProject = {
-        id: Date.now(), // Simple unique ID using timestamp
+        id: Date.now(), 
         title: title.trim(),
         description: description.trim(),
         technologies: technologies
